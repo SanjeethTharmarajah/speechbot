@@ -37,8 +37,14 @@ A simple web application located at `https://sanjeeth.rf.gd/speech/` built for *
 | Text-to-Speech | Web Speech Synthesis / External TTS API |
 | Hosting | InfinityFree / RF-GD free hosting |
 
+## Requirements
+1. Get API Key from groq at https://console.groq.com/keys
+2. Add API key in config.php
+3. Use browsers like Chrome or Edge which supports Web Speech API (This only works in Web Speech API supported browsers only)
+
+
 ## 🧩 Setup & Installation
 
 1. Clone this repository:  
    ```bash
-   git clone https://your-repo-url.git
+   git clone https://github.com/SanjeethTharmarajah/speechbot.git
