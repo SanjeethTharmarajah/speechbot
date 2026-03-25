@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Speech-to-Speech Chat Lisa-AI</title>
+<style>
+  body { text-align: center; font-family: Arial, sans-serif; background: #ffffff; }
+  canvas { background: black; }
+  .mouth {
+    position: absolute;
+    top: 180px;
+    left: 222px;
+    width: 60px;
+    height: 20px;
+    border-radius: 100%;
+  }
+</style>
+</head>
+<body>
+  <center>
+  <h1>Speech-to-Speech Chat with Lisa-AI Created by Sanjeeth.T</h1>
+  <p>(Ask Lisa simple one word questions. If the response is more than 100 words, Lisa can't talk.)</p>
+  <div style="width:450px; height:534px; position:relative;">
+    <img src="robo.jpg" alt="Robot face" width="450" height="534">
+    <canvas id="waveformCanvas" class="mouth"></canvas>
+  </div>
+
+  <audio id="audioPlayer" style="display:none;">
+    <source src="" type="audio/wav">
+    Your browser does not support the audio element.
+  </audio>
+<br>
+  <button id="startRecording">🎤 Start Speaking</button>
+  <p id="userText">You said: <span></span></p>
+  <p id="responseText">Response: <span></span></p>
+
+  <script>
+    const audioPlayer = document.getElementById("audioPlayer");
+    const startBtn = document.getElementById("startRecording");
+    const userText = document.querySelector("#userText span");
+    const responseText = document.querySelector("#responseText span");
+
+    // Cross-browser SpeechRecognition setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
+
+      startBtn.onclick = () => {
+        try {
+          recognition.start();
+          startBtn.textContent = "🎙️ Listening...";
+        } catch (e) {
+          console.warn("Recognition already started:", e);
+        }
+      };
+
+      recognition.onresult = (event) => {
+        startBtn.textContent = "🎤 Start Speaking";
+        const transcript = event.results[0][0].transcript;
+        userText.textContent = transcript;
+
+        fetch("process_audio.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: transcript })
+        })
+        .then(res => res.json())
+        .then(data => {
+          responseText.textContent = data.response;
+          audioPlayer.src = "text_to_speech.php?text=" + encodeURIComponent(data.response);
+          audioPlayer.play().catch(err => {
+            console.warn("Playback blocked until user interaction:", err);
+          });
+        })
+        .catch(err => console.error("Error:", err));
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        startBtn.textContent = "🎤 Start Speaking";
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          alert("Microphone access denied. Please allow it in your browser settings.");
+        }
+      };
+
+      recognition.onend = () => {
+        startBtn.textContent = "🎤 Start Speaking";
+      };
+    } else {
+      // Fallback if browser doesn’t support Web Speech API
+      startBtn.onclick = () => {
+        const text = prompt("Your browser doesn't support speech recognition. Type your question:");
+        if (text) {
+          userText.textContent = text;
+          fetch("process_audio.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text })
+          })
+          .then(res => res.json())
+          .then(data => {
+            responseText.textContent = data.response;
+            audioPlayer.src = "text_to_speech.php?text=" + encodeURIComponent(data.response);
+            audioPlayer.play();
+          })
+          .catch(err => console.error("Error:", err));
+        }
+      };
+      alert("Speech recognition not supported in this browser (try Chrome, Edge, or Safari 14+).");
+    }
+  </script>
+
+  <script>
+    // Waveform visualization
+    const audio = document.getElementById("audioPlayer");
+    const canvas = document.getElementById("waveformCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let audioContext, analyser, source;
+    let bufferLength, dataArray;
+
+    function initializeAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+
+        source = audioContext.createMediaElementSource(audio);
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+      }
+    }
+
+    function drawWaveform() {
+      requestAnimationFrame(drawWaveform);
+      if (!analyser) return;
+      analyser.getByteTimeDomainData(dataArray);
+
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 25;
+      ctx.strokeStyle = "#60b3c2";
+      ctx.beginPath();
+
+      const sliceWidth = canvas.width / bufferLength;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = v * canvas.height / 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        x += sliceWidth;
+      }
+
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+    }
+
+    audio.addEventListener("play", () => {
+      initializeAudio();
+      if (audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+      drawWaveform();
+    });
+  </script>
+  </center>
+</body>
+</html>
